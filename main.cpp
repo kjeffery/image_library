@@ -378,7 +378,7 @@ int main()
 
     test_array();
 
-    Image img = read(R"(C:\Users\Keith\Downloads\memorial.pfm)");
+    Image img = read(R"(C:\Users\krjef\CLionProjects\image_library\memorial.pfm)");
 
     //SamplerBilinear sampler_bilinear;
     //write("binliear.pfm", reconstruct_image(sampler_bilinear, img));
