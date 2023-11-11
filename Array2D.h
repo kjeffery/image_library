@@ -6,6 +6,10 @@
 
 #include "Morton.h"
 
+#include "Logger/Logger.h"
+
+//#include <experimental/propagate_const>
+
 #include <cassert>
 #include <memory>
 
@@ -129,9 +133,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(m_impl.get_allocator(), memory_size(width, height)))
         {
-            std::cerr << "Allocated storage for " << memory_size(width, height) << " objects\n";
-            std::cerr << "Tiles width: " << num_tiles_width(width) << '\n';
-            std::cerr << "Tiles height: " << num_tiles_height(height) << '\n';
+            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
+            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
+            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
             construct();
         }
 
@@ -141,9 +145,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(this->get_allocator(), memory_size(width, height)))
         {
-            std::cerr << "Allocated storage for " << memory_size(width, height) << " objects\n";
-            std::cerr << "Tiles width: " << num_tiles_width(width) << '\n';
-            std::cerr << "Tiles height: " << num_tiles_height(height) << '\n';
+            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
+            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
+            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
             construct();
         }
 
@@ -153,9 +157,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(this->get_allocator(), memory_size(width, height)))
         {
-            std::cerr << "Allocated storage for " << memory_size(width, height) << " objects\n";
-            std::cerr << "Tiles width: " << num_tiles_width(width) << '\n';
-            std::cerr << "Tiles height: " << num_tiles_height(height) << '\n';
+            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
+            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
+            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
             construct(val);
         }
 
@@ -370,7 +374,7 @@ private:
 
         size_type m_width;
         size_type m_height;
-        //std::experimental::propogate_const<T*> m_data;
+        //std::experimental::propagate_const<T*> m_data;
         T* m_data;
     };
 

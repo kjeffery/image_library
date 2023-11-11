@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.17)
 project(ImageLibrary)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
-add_executable(ImageLibrary main.cpp)
+if (MSVC)
+    add_compile_options("/Zc:preprocessor")
+endif()
+
+add_executable(ImageLibrary main.cpp
+)
