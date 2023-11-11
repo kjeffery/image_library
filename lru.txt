@@ -1,0 +1,17 @@
+
+Payload lookup(key)
+	if (cache_lookup(key))
+		return cached
+	else
+		create(key)
+		if (!room)
+			evict_lru
+		add_to_cache
+		return new
+
+cache_lookup(key)
+	look in hash_map
+
+add_to_cache(key)
+	add to hash map
+	add to heap (key->access)
