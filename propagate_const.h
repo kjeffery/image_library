@@ -34,29 +34,15 @@ public:
     propagate_const(const propagate_const&) = delete;
 
     template <typename U>
-    requires (std::is_constructible_v<U, T> && std::is_convertible_v<U, T>)
-    constexpr propagate_const(propagate_const<U>&& pu)
+    requires std::is_constructible_v<U, T>
+    constexpr explicit(!std::is_convertible_v<U, T>) propagate_const(propagate_const<U>&& pu)
     : m_t(std::move(pu.m_t))
     {
     }
 
     template <typename U>
-    requires (std::is_constructible_v<U, T> && !std::is_convertible_v<U, T>)
-    constexpr explicit propagate_const(propagate_const<U>&& pu)
-    : m_t(std::move(pu.m_t))
-    {
-    }
-
-    template <typename U>
-    requires (!is_propagate_const_v<std::decay_t<U>> && std::is_constructible_v<U, T> && std::is_convertible_v<U, T>)
-    constexpr propagate_const(U&& u)
-    : m_t(std::forward<U>(u))
-    {
-    }
-
-    template <typename U>
-    requires (!is_propagate_const_v<std::decay_t<U>> && std::is_constructible_v<U, T> && !std::is_convertible_v<U, T>)
-    constexpr explicit propagate_const(U&& u)
+    requires (!is_propagate_const_v<std::decay_t<U>> && std::is_constructible_v<U, T>)
+    constexpr explicit(!std::is_convertible_v<U, T>) propagate_const(U&& u)
     : m_t(std::forward<U>(u))
     {
     }
