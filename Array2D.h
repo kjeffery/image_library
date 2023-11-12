@@ -123,6 +123,7 @@ public:
     }
 
 private:
+    // TODO: replace with [[no_unique_address]] (or [[msvc::no_unique_address]])
     struct Impl : public allocator_type
     {
         Impl() noexcept(noexcept(allocator_type{}))
@@ -388,4 +389,104 @@ private:
     };
 
     Impl m_impl;
+};
+
+template <typename T, typename allocator_t = std::allocator<T>>
+class Array2D
+{
+    using MemoryContainer = std::vector<T, allocator_t>;
+
+    using allocator_traits = std::allocator_traits<allocator_t>;
+
+public:
+    using size_type       = std::uint32_t;
+    using difference_type = std::ptrdiff_t;
+    using allocator_type  = allocator_t;
+    using value_type      = T;
+    using reference       = value_type&;
+    using const_reference = const value_type&;
+    using pointer         = typename allocator_traits::pointer;
+    using const_pointer   = typename allocator_traits::const_pointer;
+
+    Array2D() = default;
+
+    Array2D(size_type width, size_type height, allocator_type allocator = allocator_type{})
+    : m_width(width)
+    , m_data(width * height, allocator)
+    {
+    }
+
+    Array2D(size_type width, size_type height, const T& val, allocator_type allocator = allocator_type{})
+    : m_width(width)
+    , m_data(width * height, val, allocator)
+    {
+    }
+
+#if 0
+    Array2D(size_type width, size_type height, unitialized_t, allocator_type allocator = allocator_type{})
+    {
+    }
+#endif
+
+    Array2D(const Array2D&) = default;
+    Array2D(Array2D&&)      = default;
+
+    Array2D& operator=(const Array2D&)  = default;
+    Array2D& operator=(Array2D&& other) = default;
+
+    void swap(Array2D& other) noexcept(noexcept(std::declval<MemoryContainer>().swap(other.m_data)))
+    {
+        using std::swap; // Allow ADL
+        swap(m_width, other.m_width);
+        swap(m_data, other.m_data);
+    }
+
+    allocator_type get_allocator() const noexcept
+    {
+        return m_data.get_allocator();
+    }
+
+    size_type width() const noexcept
+    {
+        return m_width;
+    }
+
+    size_type height() const noexcept
+    {
+        // One of the drawbacks of storing in a vector is that we either over-specify by storing width and height along
+        // with the vector's storing of size, or we do this calculation.
+        assert(m_width > 0);
+        return m_data.size() / m_width;
+    }
+
+    reference operator()(size_type x, size_type y) noexcept
+    {
+        const size_type idx = get_data_index(x, y);
+        return m_data[idx];
+    }
+
+    const_reference operator()(size_type x, size_type y) const noexcept
+    {
+        const size_type idx = get_data_index(x, y);
+        return m_data[idx];
+    }
+
+    pointer data()
+    {
+        return m_data.data();
+    }
+
+    const_pointer data() const
+    {
+        return m_data.data();
+    }
+
+private:
+    size_type get_data_index(size_type x, size_type y) const noexcept
+    {
+        return m_width * y + x;
+    }
+
+    size_type       m_width;
+    MemoryContainer m_data;
 };
