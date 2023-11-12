@@ -65,25 +65,23 @@ FixNamespaceComments: true
 IfMacros: [ 'IF_CONSTEXPR' ]
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^"[^/]*"'
+  - Regex: '^"[^/]*"'  # Any quoted include without a path (/)
     Priority: 1
-    SortPriority: 0
     CaseSensitive: false
-  - Regex: '^".*"'
+  - Regex: '^".*"'     # Any quoted include
     Priority: 2
-    SortPriority: 0
     CaseSensitive: false
-  - Regex: '^<.+/.+>'
+  - Regex: '^<.*\..*>' # Any angle brackets with an extension (period)
     Priority: 3
-    SortPriority: 0
     CaseSensitive: false
-  - Regex: '^<[^/]*>'
+  - Regex: '^<.+/.+>'  # Any angle brackets with a path (/)
     Priority: 4
-    SortPriority: 0
+    CaseSensitive: false
+  - Regex: '^<[^/]*>'  # Any angle brackets without a path (/) (assume these are C++ stdlib)
+    Priority: 5
     CaseSensitive: false
   - Regex: '.*'
-    Priority: 5
-    SortPriority: 0
+    Priority: 6
     CaseSensitive: false
 IndentAccessModifiers: false
 IndentCaseBlocks: true
@@ -93,7 +91,7 @@ IndentGotoLabels: false
 IndentPPDirectives: AfterHash
 IndentRequiresClause: false
 IndentWrappedFunctionNames: false
-#InsertBraces: true
+InsertBraces: true
 KeepEmptyLinesAtTheStartOfBlocks: false
 LambdaBodyIndentation: Signature
 NamespaceIndentation: None
