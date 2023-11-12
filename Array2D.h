@@ -5,15 +5,17 @@
 #pragma once
 
 #include "Morton.h"
+#include "propagate_const.h"
 
 #include "Logger/Logger.h"
-
-//#include <experimental/propagate_const>
 
 #include <cassert>
 #include <memory>
 
-struct unitialized_t {};
+struct unitialized_t
+{
+};
+
 constexpr unitialized_t unitialized;
 
 template <typename T, std::uint32_t log_tile_size = 4, typename allocator_t = std::allocator<T>>
@@ -172,7 +174,7 @@ private:
             for (size_type y = 0; y < m_height; ++y) {
                 for (size_type x = 0; x < m_width; ++x) {
                     const auto idx = get_data_index(x, y);
-                    T* const p = m_data + idx;
+                    T* const   p   = m_data + idx;
                     allocator_traits::construct(this->get_allocator(), p, other.m_data[idx]);
                 }
             }
@@ -182,7 +184,7 @@ private:
         : allocator_type(std::move(other))
         , m_width(other.m_width)
         , m_height(other.m_height)
-        , m_data(other.m_data)
+        , m_data(std::move(other.m_data))
         {
             other.m_width  = 0;
             other.m_height = 0;
@@ -202,8 +204,8 @@ private:
 
         Impl& operator=(const Impl& other)
         {
-            // If we have to propagate allocators, and the allocators are not equal, we have to deallocate and re-allocate.
-            // If we don't have to propagate, we have to reallocate if the size has changed.
+            // If we have to propagate allocators, and the allocators are not equal, we have to deallocate and
+            // re-allocate. If we don't have to propagate, we have to reallocate if the size has changed.
 
             //            | allocator == | allocator != |
             // -----------+--------------+--------------+
@@ -213,7 +215,7 @@ private:
             // -----------+--------------+--------------+
 
             constexpr bool propagate = allocator_traits::propagate_on_container_copy_assignment;
-            const bool realloc = (propagate && !allocators_equal(*this, other)) ||
+            const bool     realloc   = (propagate && !allocators_equal(*this, other)) ||
                                  (m_width != other.m_width || m_height != other.m_height);
 
             destroy();
@@ -227,7 +229,7 @@ private:
             }
 
             // These may already be equal
-            m_width = other.m_width;
+            m_width  = other.m_width;
             m_height = other.m_height;
 
             if (realloc) {
@@ -237,7 +239,7 @@ private:
             for (size_type y = 0; y < m_height; ++y) {
                 for (size_type x = 0; x < m_width; ++x) {
                     const auto idx = get_data_index(x, y);
-                    T* const p = m_data + idx;
+                    T* const   p   = m_data + idx;
                     allocator_traits::construct(this->get_allocator(), p, other.m_data[idx]);
                 }
             }
@@ -251,9 +253,10 @@ private:
                 allocator_traits::deallocate(this->get_allocator(), m_data, memory_size(m_width, m_height));
 
                 static_cast<allocator_type>(*this) = std::move(static_cast<allocator_type>(other));
-                m_width        = other.m_width;
-                m_height       = other.m_height;
-                m_data         = other.m_data;
+
+                m_width  = other.m_width;
+                m_height = other.m_height;
+                m_data   = other.m_data;
 
                 other.m_width  = 0;
                 other.m_height = 0;
@@ -268,15 +271,17 @@ private:
                     destroy();
                     allocator_traits::deallocate(this->get_allocator(), m_data, memory_size(m_width, m_height));
 
-                    m_width = other.m_width;
+                    m_width  = other.m_width;
                     m_height = other.m_height;
-                    m_data = allocator_traits::allocate(m_impl.get_allocator(), memory_size(m_width, m_height));
+                    m_data   = allocator_traits::allocate(m_impl.get_allocator(), memory_size(m_width, m_height));
 
                     for (size_type y = 0; y < m_height; ++y) {
                         for (size_type x = 0; x < m_width; ++x) {
                             const auto idx = get_data_index(x, y);
-                            T* const p = m_data + idx;
-                            allocator_traits::construct(this->get_allocator(), p, std::move_if_noexcept(other.m_data[idx]));
+                            T* const   p   = m_data + idx;
+                            allocator_traits::construct(this->get_allocator(),
+                                                        p,
+                                                        std::move_if_noexcept(other.m_data[idx]));
                         }
                     }
                 }
@@ -314,15 +319,15 @@ private:
 
         size_type get_data_index(size_type x, size_type y) const noexcept
         {
-            const size_type tile_x       = x / k_tile_width;
-            const size_type tile_y       = y / k_tile_height;
+            const size_type     tile_x   = x / k_tile_width;
+            const size_type     tile_y   = y / k_tile_height;
             const std::uint16_t offset_x = x % k_tile_height;
             const std::uint16_t offset_y = y % k_tile_height;
 
             const size_type index_in_tile = morton_encode(offset_x, offset_y);
             assert(index_in_tile < k_tile_width * k_tile_height);
             const size_type tile_index = tile_y * num_tiles_width(m_width) + tile_x;
-            const size_type idx = tile_index * (k_tile_width * k_tile_height) + index_in_tile;
+            const size_type idx        = tile_index * (k_tile_width * k_tile_height) + index_in_tile;
             assert(idx < memory_size(m_width, m_height));
             return idx;
         }
@@ -372,12 +377,11 @@ private:
             }
         }
 
-        size_type m_width;
-        size_type m_height;
-        //std::experimental::propagate_const<T*> m_data;
-        T* m_data;
+        size_type           m_width;
+        size_type           m_height;
+        propagate_const<T*> m_data;
+        // T* m_data;
     };
 
     Impl m_impl;
 };
-
