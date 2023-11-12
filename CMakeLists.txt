@@ -7,6 +7,8 @@ if (MSVC)
     add_compile_options("/Zc:preprocessor")
 endif()
 
+include_directories(Logger)
+
 add_executable(ImageLibrary main.cpp
         propagate_const.h
 )

@@ -7,7 +7,7 @@
 #include "Morton.h"
 #include "propagate_const.h"
 
-#include "Logger/Logger.h"
+#include <Logger.h>
 
 #include <cassert>
 #include <memory>
