@@ -20,7 +20,7 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-using Image = Array2D<RGB>;
+using Image = Array2DSFC<RGB>;
 
 inline float rgb_to_srgb(float u) noexcept
 {

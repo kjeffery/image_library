@@ -17,7 +17,7 @@ struct NoDefault
 
 void test_array()
 {
-    Array2D<int> array(23, 47);
+    Array2DSFC<int> array(23, 47);
 
     int counter = 0;
     for (std::uint32_t y = 0; y < array.height(); ++y) {
@@ -350,7 +350,7 @@ Image reconstruct_image(Sampler& sampler, const Image& input, Image::size_type w
     using size_type = Image::size_type;
 
     Image ret(width, height);
-    Array2D<int> count(width, height, 0);
+    Array2DSFC<int> count(width, height, 0);
 
     for (size_type i = 0; i < nsamples; ++i) {
         const Point st = r_sequence(i);

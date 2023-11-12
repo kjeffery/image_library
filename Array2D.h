@@ -18,8 +18,12 @@ struct unitialized_t
 
 constexpr unitialized_t unitialized;
 
+// This array uses a space-filling curve to access elements, allowing greater cache coherency. It does it's own memory
+// management, because it allocates more space than it has elements. If it wrapped a std::vector, for instance, we would
+// have to put further constraints on the contained type: e.g., it will have to be default constructable (because there
+// will be unused gaps in the vector, but the items would still have to be constructed).
 template <typename T, std::uint32_t log_tile_size = 4, typename allocator_t = std::allocator<T>>
-class Array2D
+class Array2DSFC
 {
     static constexpr int k_tile_width  = 1 << log_tile_size;
     static constexpr int k_tile_height = 1 << log_tile_size;
@@ -36,23 +40,23 @@ public:
     using pointer         = typename allocator_traits::pointer;
     using const_pointer   = typename allocator_traits::const_pointer;
 
-    Array2D() noexcept(noexcept(Impl()))
+    Array2DSFC() noexcept(noexcept(Impl()))
     : m_impl()
     {
     }
 
-    Array2D(size_type width, size_type height, allocator_type allocator = allocator_type{})
+    Array2DSFC(size_type width, size_type height, allocator_type allocator = allocator_type{})
     : m_impl(width, height, allocator)
     {
     }
 
-    Array2D(size_type width, size_type height, const T& val, allocator_type allocator = allocator_type{})
+    Array2DSFC(size_type width, size_type height, const T& val, allocator_type allocator = allocator_type{})
     : m_impl(width, height, val, allocator)
     {
     }
 
 #if 0
-    Array2D(size_type width, size_type height, unitialized_t, allocator_type allocator = allocator_type{})
+    Array2DSFC(size_type width, size_type height, unitialized_t, allocator_type allocator = allocator_type{})
     : m_impl(width, height, allocator)
     , m_data(allocator_traits::allocate(m_impl.get_allocator(), memory_size(width, height)))
     {
@@ -60,33 +64,33 @@ public:
     }
 #endif
 
-    Array2D(const Array2D& other)
+    Array2DSFC(const Array2DSFC& other)
     : m_impl(other.m_impl)
     {
     }
 
-    Array2D(Array2D&& other) noexcept
+    Array2DSFC(Array2DSFC&& other) noexcept
     : m_impl(std::move(other.m_impl))
     {
     }
 
-    ~Array2D() noexcept
+    ~Array2DSFC() noexcept
     {
     }
 
-    Array2D& operator=(const Array2D& other)
+    Array2DSFC& operator=(const Array2DSFC& other)
     {
         m_impl = other.m_impl;
         return *this;
     }
 
-    Array2D& operator=(Array2D&& other) noexcept
+    Array2DSFC& operator=(Array2DSFC&& other) noexcept
     {
         m_impl = std::move(other.m_impl);
         return *this;
     }
 
-    void swap(Array2D& other) noexcept(noexcept(std::declval<Array2D>().swap(other)))
+    void swap(Array2DSFC& other) noexcept(noexcept(std::declval<Array2DSFC>().swap(other)))
     {
         m_impl.swap(other.m_impl);
     }
