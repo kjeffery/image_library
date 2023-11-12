@@ -4,147 +4,30 @@
 
 #pragma once
 
+#include <bit>
 #include <cstdint>
+#include <type_traits>
 
-#if defined(_MSC_FULL_VER)
+// This is not likely to happen, but it _is_ possible for machines to be an odd mix of big or little endian (at least
+// according to some historic documents).
+static_assert(std::endian::native == std::endian::big || std::endian::native == std::endian::little);
 
-#include <cstdlib>
-
-inline std::uint16_t little_endian(std::uint16_t v)
+template <typename T>
+requires std::is_integral_v<T> constexpr T little_endian(T v)
 {
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return _byteswap_ushort(v);
-#else
-    #error Unsupported endianess
-#endif
+    if constexpr (std::endian::native == std::endian::little) {
+        return v;
+    } else {
+        return std::byteswap(v);
+    }
 }
 
-inline std::uint16_t big_endian(std::uint16_t v)
+template <typename T>
+requires std::is_integral_v<T> constexpr T big_endian(T v)
 {
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return _byteswap_ushort(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
+    if constexpr (std::endian::native == std::endian::little) {
+        return std::byteswap(v);
+    } else {
+        return v;
+    }
 }
-
-inline std::uint32_t little_endian(std::uint32_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return _byteswap_ulong(v);
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint32_t big_endian(std::uint32_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return _byteswap_ulong(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint64_t little_endian(std::uint64_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return _byteswap_uint64(v);
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint64_t big_endian(std::uint64_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return _byteswap_uint64(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
-}
-
-#else
-
-#include <byteswap.h>
-
-inline std::uint16_t little_endian(std::uint16_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return __bswap_16(v);
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint16_t big_endian(std::uint16_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return __bswap_16(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint32_t little_endian(std::uint32_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return __bswap_32(v);
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint32_t big_endian(std::uint32_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return __bswap_32(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint64_t little_endian(std::uint64_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return v;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return __bswap_64(v);
-#else
-    #error Unsupported endianess
-#endif
-}
-
-inline std::uint64_t big_endian(std::uint64_t v)
-{
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return __bswap_64(v);
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    return v;
-#else
-    #error Unsupported endianess
-#endif
-}
-
-#endif
-
