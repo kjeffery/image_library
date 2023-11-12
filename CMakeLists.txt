@@ -8,4 +8,5 @@ if (MSVC)
 endif()
 
 add_executable(ImageLibrary main.cpp
+        propagate_const.h
 )
