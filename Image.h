@@ -14,46 +14,107 @@
 #include <stdexcept>
 #include <string>
 
+enum class ImageFormat
+{
+    Unknown,
+    PPM_binary,
+    PPM_ascii,
+    PFM
+};
+
 class ImageError : public std::runtime_error
 {
 public:
     using std::runtime_error::runtime_error;
 };
 
-using Image = Array2DSFC<RGB>;
+using ImageSFCf = Array2DSFC<RGBf>;
+using Image_f   = Array2D<RGBf>;
+using Image_8   = Array2D<RGB8>;
+using Image_16  = Array2D<RGB16>;
+using Image_32  = Array2D<RGB32>;
 
 inline float rgb_to_srgb(float u) noexcept
 {
     if (u <= 0.0031308f) {
         return 12.92f * u;
     } else {
-        return 1.055f * std::pow(u, 1.0f/2.4f) - 0.055f;
+        return 1.055f * std::pow(u, 1.0f / 2.4f) - 0.055f;
     }
 }
 
-inline RGB rgb_to_srgb(const RGB& c) noexcept
+inline RGBf rgb_to_srgb(const RGBf& c) noexcept
 {
-    return RGB{rgb_to_srgb(c.r), rgb_to_srgb(c.g), rgb_to_srgb(c.b)};
+    return { rgb_to_srgb(c.r), rgb_to_srgb(c.g), rgb_to_srgb(c.b) };
 }
 
-inline void write_ppm(std::ostream& outs, const Image& img)
+template <typename ImageType>
+inline void write_ppm_8(std::ostream& outs, const ImageType& img)
 {
+    constexpr uint8_t max_value = 255;
+
     const int nx = img.width();
     const int ny = img.height();
-    outs << "P3\n" << nx << ' ' << ny << "\n255\n";
-    for (int j = ny-1; j >= 0; --j) {
+    println(outs, "P6");
+    println(outs, "{} {}", nx, ny);
+    println(outs, "{}", max_value);
+    for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
-            const RGB c = rgb_to_srgb(img(i, j));
-            //const RGB& c = fb[pixel_index];
-            const int ir = static_cast<int>(255.99f*c.r);
-            const int ig = static_cast<int>(255.99f*c.g);
-            const int ib = static_cast<int>(255.99f*c.b);
-            outs << ir << ' ' << ig << ' ' << ib << '\n';
+            const RGBf c  = rgb_to_srgb(clamp(to_float(img(i, j))));
+            const auto ir = static_cast<uint8_t>(max_value * c.r);
+            const auto ig = static_cast<uint8_t>(max_value * c.g);
+            const auto ib = static_cast<uint8_t>(max_value * c.b);
+            outs.write(reinterpret_cast<const char*>(&ir), sizeof(uint8_t));
+            outs.write(reinterpret_cast<const char*>(&ig), sizeof(uint8_t));
+            outs.write(reinterpret_cast<const char*>(&ib), sizeof(uint8_t));
         }
     }
 }
 
-inline void write_ppm(const std::filesystem::path& file, const Image& img)
+template <typename ImageType>
+inline void write_ppm_16(std::ostream& outs, const ImageType& img)
+{
+    constexpr uint16_t max_value = 65'535;
+
+    const int nx = img.width();
+    const int ny = img.height();
+    println(outs, "P6");
+    println(outs, "{} {}", nx, ny);
+    println(outs, "{}", max_value);
+    for (int j = ny - 1; j >= 0; --j) {
+        for (int i = 0; i < nx; ++i) {
+            const RGBf c  = rgb_to_srgb(clamp(to_float(img(i, j))));
+            const auto ir = big_endian(static_cast<uint16_t>(max_value * c.r));
+            const auto ig = big_endian(static_cast<uint16_t>(max_value * c.g));
+            const auto ib = big_endian(static_cast<uint16_t>(max_value * c.b));
+            outs.write(reinterpret_cast<const char*>(&ir), sizeof(uint16_t));
+            outs.write(reinterpret_cast<const char*>(&ig), sizeof(uint16_t));
+            outs.write(reinterpret_cast<const char*>(&ib), sizeof(uint16_t));
+        }
+    }
+}
+
+template <typename ImageType>
+inline void write_plain_ppm(std::ostream& outs, const ImageType& img)
+{
+    const int nx = img.width();
+    const int ny = img.height();
+    println(outs, "P3");
+    println(outs, "{} {}", nx, ny);
+    println(outs, "255");
+    for (int j = ny - 1; j >= 0; --j) {
+        for (int i = 0; i < nx; ++i) {
+            const RGBf c  = rgb_to_srgb(clamp(to_float(img(i, j))));
+            const auto ir = static_cast<int>(255.0f * c.r);
+            const auto ig = static_cast<int>(255.0f * c.g);
+            const auto ib = static_cast<int>(255.0f * c.b);
+            std::println(outs, "{} {} {}", ir, ig, ib);
+        }
+    }
+}
+
+template <typename ImageType>
+inline void write_ppm(const std::filesystem::path& file, const ImageType& img)
 {
     std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
     if (!outs) {
@@ -62,21 +123,16 @@ inline void write_ppm(const std::filesystem::path& file, const Image& img)
     write_ppm(outs, img);
 }
 
-inline void write_pfm(std::ostream& outs, const Image& img)
+inline void write_pfm(std::ostream& outs, const Image_f& img)
 {
-#if   __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    const int byte_order = -1;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    const int byte_order = +1;
-#endif
+    constexpr int byte_order = (std::endian::native == std::endian::little) ? -1 : +1;
 
     const int nx = img.width();
     const int ny = img.height();
     outs << "PF\n" << nx << ' ' << ny << '\n' << byte_order << '\n';
-    for (int j = ny-1; j >= 0; --j) {
+    for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
             const auto& c = img(i, j);
-            //std::cout << c.r << " " << c.g << " " << c.b << '\n';
             outs.write(reinterpret_cast<const char*>(&c.r), sizeof(float));
             outs.write(reinterpret_cast<const char*>(&c.g), sizeof(float));
             outs.write(reinterpret_cast<const char*>(&c.b), sizeof(float));
@@ -84,7 +140,7 @@ inline void write_pfm(std::ostream& outs, const Image& img)
     }
 }
 
-inline void write_pfm(const std::filesystem::path& file, const Image& img)
+inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
 {
     std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
     if (!outs) {
@@ -105,10 +161,46 @@ inline void write(const std::filesystem::path& file, const Image& img)
     }
 }
 
-inline Image read_pfm(std::istream& ins)
+inline auto get_image_format(std::istream& ins)
+{
+    ins.seekg(0);
+
+    std::string format;
+    ins >> format;
+
+    if (format == "PF") {
+        return std::make_pair(ImageFormat::PFM, 32);
+    } else if (format == "P3") {
+        return std::make_pair(ImageFormat::PPM_ascii, 8);
+    } else if (format == "P6") {
+        int colors;
+        int throw_away;
+        ins >> throw_away; // Width
+        ins >> throw_away; // Height
+        ins >> colors;
+
+        if (colors < 256) {
+            return std::make_pair(ImageFormat::PPM_binary, 8);
+        } else {
+            return std::make_pair(ImageFormat::PPM_binary, 16);
+        }
+    }
+    return std::make_pair(ImageFormat::Unknown, 0);
+}
+
+inline auto get_image_format(const std::filesystem::path& file)
+{
+    std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
+    if (!ins) {
+        throw ImageError("Unable to open " + file.string());
+    }
+    return get_image_format(ins);
+}
+
+inline Image_f read_pfm(std::istream& ins)
 {
     std::string format;
-    std::getline(ins, format);
+    ins >> format;
     if (format != "PF") {
         throw ImageError("Unexpected format");
     }
@@ -121,13 +213,14 @@ inline Image read_pfm(std::istream& ins)
     ins.get(); // Get last '\n'
 
     using ConvertFunction = std::uint32_t (*)(std::uint32_t);
-    const ConvertFunction be = &big_endian;
-    const ConvertFunction le = &little_endian;
+
+    const ConvertFunction be      = &big_endian;
+    const ConvertFunction le      = &little_endian;
     const ConvertFunction convert = (byte_order > 0) ? be : le;
 
-    Image img(nx, ny);
+    Image_f img(nx, ny);
 
-    for (int j = ny-1; j >= 0; --j) {
+    for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
             std::uint32_t r;
             std::uint32_t g;
@@ -135,12 +228,15 @@ inline Image read_pfm(std::istream& ins)
             ins.read(reinterpret_cast<char*>(&r), sizeof(std::uint32_t));
             ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint32_t));
             ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint32_t));
+
             r = convert(r);
             g = convert(g);
             b = convert(b);
+
             const float fr = *reinterpret_cast<float*>(&r);
             const float fg = *reinterpret_cast<float*>(&g);
             const float fb = *reinterpret_cast<float*>(&b);
+
             img(i, j) = RGB(fr, fg, fb);
         }
     }
@@ -148,7 +244,7 @@ inline Image read_pfm(std::istream& ins)
     return img;
 }
 
-inline Image read_pfm(const std::filesystem::path& file)
+inline Image_f read_pfm(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
@@ -171,10 +267,12 @@ constexpr float k_max_less_than_one = 0x1.fffffe0000000p-1f;
 
 inline RGB sample_nearest_neighbor(const Image& img, float s, float t)
 {
+    // clang-format off
     assert(s >= 0.0f);
     assert(t >= 0.0f);
     assert(s <  1.0f);
     assert(t <  1.0f);
+    // clang-format on
 
     using size_type = Image::size_type;
 
@@ -189,15 +287,18 @@ inline RGB sample_nearest_neighbor(const Image& img, float s, float t)
 
 inline RGB sample_bilinear(const Image& img, float s, float t)
 {
+    // clang-format off
     assert(s >= 0.0f);
     assert(t >= 0.0f);
     assert(s <  1.0f);
     assert(t <  1.0f);
+    // clang-format on
 
     using size_type = Image::size_type;
 
     const float u = s * img.width();
     const float v = t * img.height();
+
     const float u_lower = std::floor(u);
     const float u_upper = std::ceil(u);
     const float v_lower = std::floor(v);
@@ -216,8 +317,10 @@ inline RGB sample_bilinear(const Image& img, float s, float t)
     const auto& c2 = img(x_lower, y_upper);
     const auto& c3 = img(x_upper, y_upper);
 
+    // clang-format off
     return v_bias *
            (u_bias          * c0 + (1.0f - u_bias) * c1) +
            (1.0f - v_bias)  *
            (u_bias          * c2 + (1.0f - u_bias) * c3);
+    // clang-format on
 }
