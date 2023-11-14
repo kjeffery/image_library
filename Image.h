@@ -114,13 +114,33 @@ inline void write_plain_ppm(std::ostream& outs, const ImageType& img)
 }
 
 template <typename ImageType>
-inline void write_ppm(const std::filesystem::path& file, const ImageType& img)
+inline void write_ppm_8(const std::filesystem::path& file, const ImageType& img)
 {
     std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
     if (!outs) {
         throw ImageError("Unable to open " + file.string());
     }
-    write_ppm(outs, img);
+    write_ppm_8(outs, img);
+}
+
+template <typename ImageType>
+inline void write_ppm_16(const std::filesystem::path& file, const ImageType& img)
+{
+    std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
+    if (!outs) {
+        throw ImageError("Unable to open " + file.string());
+    }
+    write_ppm_16(outs, img);
+}
+
+template <typename ImageType>
+inline void write_plain_ppm(const std::filesystem::path& file, const ImageType& img)
+{
+    std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
+    if (!outs) {
+        throw ImageError("Unable to open " + file.string());
+    }
+    write_plain_ppm(outs, img);
 }
 
 inline void write_pfm(std::ostream& outs, const Image_f& img)
@@ -147,18 +167,6 @@ inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
         throw ImageError("Unable to open " + file.string());
     }
     write_pfm(outs, img);
-}
-
-inline void write(const std::filesystem::path& file, const Image& img)
-{
-    const auto ext = file.extension().string();
-    if (ext == ".pfm") {
-        write_pfm(file, img);
-    } else if (ext == ".ppm") {
-        write_ppm(file, img);
-    } else {
-        throw ImageError("Unknown file extension: " + ext);
-    }
 }
 
 inline auto get_image_format(std::istream& ins)
@@ -197,6 +205,103 @@ inline auto get_image_format(const std::filesystem::path& file)
     return get_image_format(ins);
 }
 
+inline Image_8 read_ppm_8(std::istream& ins)
+{
+    std::string format;
+    ins >> format;
+    if (format != "P6") {
+        throw ImageError("Unexpected format");
+    }
+    int nx;
+    int ny;
+    ins >> nx;
+    ins >> ny;
+    int max_color_val;
+    ins >> max_color_val;
+    ins.get(); // Get last '\n'
+
+    if (max_color_val >= 256) {
+        throw ImageError("Unexpected color depth");
+    }
+
+    Image_8 img(nx, ny);
+
+    for (int j = ny - 1; j >= 0; --j) {
+        for (int i = 0; i < nx; ++i) {
+            std::uint8_t r;
+            std::uint8_t g;
+            std::uint8_t b;
+            ins.read(reinterpret_cast<char*>(&r), sizeof(std::uint8_t));
+            ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint8_t));
+            ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint8_t));
+
+            img(i, j) = RGB8(r, g, b);
+        }
+    }
+
+    return img;
+}
+
+inline Image_8 read_ppm_8(const std::filesystem::path& file)
+{
+    std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
+    if (!ins) {
+        throw ImageError("Unable to open " + file.string());
+    }
+    return read_ppm_8(ins);
+}
+
+inline Image_16 read_ppm_16(std::istream& ins)
+{
+    std::string format;
+    ins >> format;
+    if (format != "P6") {
+        throw ImageError("Unexpected format");
+    }
+    int nx;
+    int ny;
+    ins >> nx;
+    ins >> ny;
+    int max_color_val;
+    ins >> max_color_val;
+    ins.get(); // Get last '\n'
+
+    if (max_color_val < 256 || max_color_val >= 65'536) {
+        throw ImageError("Unexpected color depth");
+    }
+
+    Image_16 img(nx, ny);
+
+    for (int j = ny - 1; j >= 0; --j) {
+        for (int i = 0; i < nx; ++i) {
+            std::uint16_t r;
+            std::uint16_t g;
+            std::uint16_t b;
+            ins.read(reinterpret_cast<char*>(&r), sizeof(std::uint16_t));
+            ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint16_t));
+            ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint16_t));
+
+            r = big_to_native_endian(r);
+            g = big_to_native_endian(g);
+            b = big_to_native_endian(b);
+
+            img(i, j) = RGB16(r, g, b);
+        }
+    }
+
+    return img;
+}
+
+inline Image_16 read_ppm_16(const std::filesystem::path& file)
+{
+    std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
+    if (!ins) {
+        throw ImageError("Unable to open " + file.string());
+    }
+    return read_ppm_16(ins);
+}
+
+// TODO: this should also work with space-filling version
 inline Image_f read_pfm(std::istream& ins)
 {
     std::string format;
@@ -253,19 +358,10 @@ inline Image_f read_pfm(const std::filesystem::path& file)
     return read_pfm(ins);
 }
 
-inline Image read(const std::filesystem::path& file)
-{
-    const auto ext = file.extension().string();
-    if (ext == ".pfm") {
-        return read_pfm(file);
-    } else {
-        throw ImageError("Unknown file extension: " + ext);
-    }
-}
-
 constexpr float k_max_less_than_one = 0x1.fffffe0000000p-1f;
 
-inline RGB sample_nearest_neighbor(const Image& img, float s, float t)
+template <typename ImageType>
+inline auto sample_nearest_neighbor(const ImageType& img, float s, float t)
 {
     // clang-format off
     assert(s >= 0.0f);
@@ -274,7 +370,7 @@ inline RGB sample_nearest_neighbor(const Image& img, float s, float t)
     assert(t <  1.0f);
     // clang-format on
 
-    using size_type = Image::size_type;
+    using size_type = typename ImageType::size_type;
 
     const float u = std::round(s * img.width());
     const float v = std::round(t * img.height());
@@ -285,7 +381,8 @@ inline RGB sample_nearest_neighbor(const Image& img, float s, float t)
     return img(x, y);
 }
 
-inline RGB sample_bilinear(const Image& img, float s, float t)
+template <typename ImageType>
+inline auto sample_bilinear(const ImageType& img, float s, float t)
 {
     // clang-format off
     assert(s >= 0.0f);
@@ -294,7 +391,7 @@ inline RGB sample_bilinear(const Image& img, float s, float t)
     assert(t <  1.0f);
     // clang-format on
 
-    using size_type = Image::size_type;
+    using size_type = typename ImageType::size_type;
 
     const float u = s * img.width();
     const float v = t * img.height();

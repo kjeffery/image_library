@@ -31,3 +31,24 @@ requires std::is_integral_v<T> constexpr T big_endian(T v)
         return v;
     }
 }
+
+template <typename T>
+requires std::is_integral_v<T> constexpr T big_to_native_endian(T v)
+{
+    if constexpr (std::endian::native == std::endian::big) {
+        return v;
+    } else {
+        return std::byteswap(v);
+    }
+}
+
+template <typename T>
+requires std::is_integral_v<T> constexpr T little_to_native_endian(T v)
+{
+    if constexpr (std::endian::native == std::endian::little) {
+        return v;
+    } else {
+        return std::byteswap(v);
+    }
+}
+
