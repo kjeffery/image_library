@@ -6,6 +6,7 @@
 
 #include "Array2D.h"
 #include "Endian.h"
+#include "IgnoreLineCommentsBuf.h"
 #include "RGB.h"
 
 #include <cassert>
@@ -16,10 +17,19 @@
 
 enum class ImageFormat
 {
-    Unknown,
+    unknown,
     PPM_binary,
     PPM_ascii,
     PFM
+};
+
+struct PNM_header
+{
+    ImageFormat   format{ ImageFormat::unknown };
+    std::uint32_t width{ 0 };
+    std::uint32_t height{ 0 };
+    std::endian   byte_order{ std::endian::big }; // 16-bit PPM is big: only PFM changes this
+    std::uint16_t max_color{ 0 };
 };
 
 class ImageError : public std::runtime_error
@@ -46,6 +56,65 @@ inline float rgb_to_srgb(float u) noexcept
 inline RGBf rgb_to_srgb(const RGBf& c) noexcept
 {
     return { rgb_to_srgb(c.r), rgb_to_srgb(c.g), rgb_to_srgb(c.b) };
+}
+
+class LineCommentStreamBufDecorator
+{
+public:
+    explicit LineCommentStreamBufDecorator(std::istream& ins)
+    : m_new_streambuf(ins.rdbuf())
+    , m_original_streambuf(ins.rdbuf())
+    , m_stream(std::addressof(ins))
+    {
+        ins.rdbuf(std::addressof(m_new_streambuf));
+    }
+
+    ~LineCommentStreamBufDecorator()
+    {
+        m_stream->rdbuf(m_original_streambuf);
+    }
+
+private:
+    IgnoreLineCommentsBuf m_new_streambuf;
+    std::streambuf*       m_original_streambuf;
+    std::istream* m_stream;
+};
+
+// Post-condition: ins is set to read image data values.
+PNM_header read_pnm_header(std::istream& ins)
+{
+    ins.seekg(0);
+
+    LineCommentStreamBufDecorator stream_raii(ins);
+
+    PNM_header header;
+
+    std::string format;
+    ins >> format;
+
+    if (format == "P3") {
+        header.format = ImageFormat::PPM_ascii;
+    } else if (format == "P6") {
+        header.format = ImageFormat::PPM_binary;
+    } else if (format == "PF") {
+        header.format = ImageFormat::PFM;
+    } else {
+        return header;
+    }
+
+    ins >> header.width;
+    ins >> header.height;
+
+    if (header.format == ImageFormat::PFM) {
+        float byte_order;
+        ins >> byte_order;
+        header.byte_order = (byte_order > 0) ? std::endian::big : std::endian::little;
+    } else {
+        ins >> header.max_color;
+    }
+    ins.get(); // Get final whitespace character
+
+    return header;
 }
 
 template <typename ImageType>
@@ -169,65 +238,22 @@ inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
     write_pfm(outs, img);
 }
 
-inline auto get_image_format(std::istream& ins)
-{
-    ins.seekg(0);
-
-    std::string format;
-    ins >> format;
-
-    if (format == "PF") {
-        return std::make_pair(ImageFormat::PFM, 32);
-    } else if (format == "P3") {
-        return std::make_pair(ImageFormat::PPM_ascii, 8);
-    } else if (format == "P6") {
-        int colors;
-        int throw_away;
-        ins >> throw_away; // Width
-        ins >> throw_away; // Height
-        ins >> colors;
-
-        if (colors < 256) {
-            return std::make_pair(ImageFormat::PPM_binary, 8);
-        } else {
-            return std::make_pair(ImageFormat::PPM_binary, 16);
-        }
-    }
-    return std::make_pair(ImageFormat::Unknown, 0);
-}
-
-inline auto get_image_format(const std::filesystem::path& file)
-{
-    std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
-    if (!ins) {
-        throw ImageError("Unable to open " + file.string());
-    }
-    return get_image_format(ins);
-}
-
 inline Image_8 read_ppm_8(std::istream& ins)
 {
-    std::string format;
-    ins >> format;
-    if (format != "P6") {
+    const auto header = read_pnm_header(ins);
+
+    if (header.format != ImageFormat::PPM_binary) {
         throw ImageError("Unexpected format");
     }
-    int nx;
-    int ny;
-    ins >> nx;
-    ins >> ny;
-    int max_color_val;
-    ins >> max_color_val;
-    ins.get(); // Get last '\n'
 
-    if (max_color_val >= 256) {
+    if (header.max_color >= 256) {
         throw ImageError("Unexpected color depth");
     }
 
-    Image_8 img(nx, ny);
+    Image_8 img(header.width, header.height);
 
-    for (int j = ny - 1; j >= 0; --j) {
-        for (int i = 0; i < nx; ++i) {
+    for (int j = header.height - 1; j >= 0; --j) {
+        for (int i = 0; i < header.width; ++i) {
             std::uint8_t r;
             std::uint8_t g;
             std::uint8_t b;
@@ -253,27 +279,20 @@ inline Image_8 read_ppm_8(const std::filesystem::path& file)
 
 inline Image_16 read_ppm_16(std::istream& ins)
 {
-    std::string format;
-    ins >> format;
-    if (format != "P6") {
+    const auto header = read_pnm_header(ins);
+
+    if (header.format != ImageFormat::PPM_binary) {
         throw ImageError("Unexpected format");
     }
-    int nx;
-    int ny;
-    ins >> nx;
-    ins >> ny;
-    int max_color_val;
-    ins >> max_color_val;
-    ins.get(); // Get last '\n'
 
-    if (max_color_val < 256 || max_color_val >= 65'536) {
+    if (header.max_color < 256 || header.max_color >= 65'536) {
         throw ImageError("Unexpected color depth");
     }
 
-    Image_16 img(nx, ny);
+    Image_16 img(header.width, header.height);
 
-    for (int j = ny - 1; j >= 0; --j) {
-        for (int i = 0; i < nx; ++i) {
+    for (int j = header.height - 1; j >= 0; --j) {
+        for (int i = 0; i < header.width; ++i) {
             std::uint16_t r;
             std::uint16_t g;
             std::uint16_t b;
@@ -304,29 +323,21 @@ inline Image_16 read_ppm_16(const std::filesystem::path& file)
 // TODO: this should also work with space-filling version
 inline Image_f read_pfm(std::istream& ins)
 {
-    std::string format;
-    ins >> format;
-    if (format != "PF") {
+    const auto header = read_pnm_header(ins);
+    if (header.format != ImageFormat::PFM) {
         throw ImageError("Unexpected format");
     }
-    int nx;
-    int ny;
-    ins >> nx;
-    ins >> ny;
-    float byte_order;
-    ins >> byte_order;
-    ins.get(); // Get last '\n'
 
     using ConvertFunction = std::uint32_t (*)(std::uint32_t);
 
     const ConvertFunction be      = &big_endian;
     const ConvertFunction le      = &little_endian;
-    const ConvertFunction convert = (byte_order > 0) ? be : le;
+    const ConvertFunction convert = (header.byte_order == std::endian::big) ? be : le;
 
-    Image_f img(nx, ny);
+    Image_f img(header.width, header.height);
 
-    for (int j = ny - 1; j >= 0; --j) {
-        for (int i = 0; i < nx; ++i) {
+    for (int j = header.height - 1; j >= 0; --j) {
+        for (int i = 0; i < header.width; ++i) {
             std::uint32_t r;
             std::uint32_t g;
             std::uint32_t b;
