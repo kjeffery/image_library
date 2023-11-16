@@ -44,7 +44,7 @@ using Image_8   = Array2D<RGB8>;
 using Image_16  = Array2D<RGB16>;
 using Image_32  = Array2D<RGB32>;
 
-inline float rgb_to_srgb(float u) noexcept
+inline float rgb_to_srgb(const float u) noexcept
 {
     if (u <= 0.0031308f) {
         return 12.92f * u;
@@ -53,9 +53,23 @@ inline float rgb_to_srgb(float u) noexcept
     }
 }
 
+inline float srgb_to_rgb(const float u) noexcept
+{
+    if (u > 0.04045f) {
+        return std::pow((u + 0.055f) / 1.055f, 2.4f);
+    } else {
+        return u / 12.92f;
+    }
+}
+
 inline RGBf rgb_to_srgb(const RGBf& c) noexcept
 {
     return { rgb_to_srgb(c.r), rgb_to_srgb(c.g), rgb_to_srgb(c.b) };
+}
+
+inline RGBf srgb_to_rgb(const RGBf& c) noexcept
+{
+    return { srgb_to_rgb(c.r), srgb_to_rgb(c.g), srgb_to_rgb(c.b) };
 }
 
 class LineCommentStreamBufDecorator
@@ -77,7 +91,7 @@ public:
 private:
     IgnoreLineCommentsBuf m_new_streambuf;
     std::streambuf*       m_original_streambuf;
-    std::istream* m_stream;
+    std::istream*         m_stream;
 };
 
 // Post-condition: ins is set to read image data values.
@@ -85,6 +99,7 @@ PNM_header read_pnm_header(std::istream& ins)
 {
     ins.seekg(0);
 
+    // Skip over comments in header reading by wrapping the stream in an RAII construct that changes out the streambuf.
     LineCommentStreamBufDecorator stream_raii(ins);
 
     PNM_header header;
@@ -240,13 +255,15 @@ inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
 
 inline Image_8 read_ppm_8(std::istream& ins)
 {
+    constexpr auto max_value = std::numeric_limits<std::uint8_t>::max();
+
     const auto header = read_pnm_header(ins);
 
     if (header.format != ImageFormat::PPM_binary) {
         throw ImageError("Unexpected format");
     }
 
-    if (header.max_color >= 256) {
+    if (header.max_color > max_value) {
         throw ImageError("Unexpected color depth");
     }
 
@@ -260,6 +277,11 @@ inline Image_8 read_ppm_8(std::istream& ins)
             ins.read(reinterpret_cast<char*>(&r), sizeof(std::uint8_t));
             ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint8_t));
             ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint8_t));
+
+            const auto fc = srgb_to_rgb(to_float(RGB8{r, g, b}));
+            r = static_cast<uint8_t>(fc.r * max_value);
+            g = static_cast<uint8_t>(fc.g * max_value);
+            b = static_cast<uint8_t>(fc.b * max_value);
 
             img(i, j) = RGB8(r, g, b);
         }
@@ -279,13 +301,15 @@ inline Image_8 read_ppm_8(const std::filesystem::path& file)
 
 inline Image_16 read_ppm_16(std::istream& ins)
 {
+    constexpr auto max_value = std::numeric_limits<std::uint16_t>::max();
+
     const auto header = read_pnm_header(ins);
 
     if (header.format != ImageFormat::PPM_binary) {
         throw ImageError("Unexpected format");
     }
 
-    if (header.max_color < 256 || header.max_color >= 65'536) {
+    if (header.max_color <= std::numeric_limits<std::uint8_t>::max() || header.max_color > max_value) {
         throw ImageError("Unexpected color depth");
     }
 
@@ -303,6 +327,11 @@ inline Image_16 read_ppm_16(std::istream& ins)
             r = big_to_native_endian(r);
             g = big_to_native_endian(g);
             b = big_to_native_endian(b);
+
+            const auto fc = srgb_to_rgb(to_float(RGB16{r, g, b}));
+            r = static_cast<uint16_t>(fc.r * max_value);
+            g = static_cast<uint16_t>(fc.g * max_value);
+            b = static_cast<uint16_t>(fc.b * max_value);
 
             img(i, j) = RGB16(r, g, b);
         }
