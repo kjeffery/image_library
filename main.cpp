@@ -36,11 +36,12 @@ void test_array()
     }
 }
 
-Image rescale_image(const Image& input, Image::size_type width, Image::size_type height)
+template <typename ImageType>
+ImageType rescale_image(const ImageType& input, typename ImageType::size_type width, typename ImageType::size_type height)
 {
-    using size_type = Image::size_type;
+    using size_type = typename ImageType::size_type;
 
-    Image out(width, height);
+    ImageType out(width, height);
     for (size_type y = 0; y < height; ++y) {
         for (size_type x = 0; x < width; ++x) {
             const float s = static_cast<float>(x) / width;
@@ -215,6 +216,7 @@ std::vector<Point> multijitter(int sqrt_n_samples, RNG& rng)
 }
 #endif
 
+#if 0
 struct SamplerBilinear
 {
     RGB operator()(const Image& img, float s, float t)
@@ -371,14 +373,17 @@ Image reconstruct_image(Sampler& sampler, const Image& input, Image::size_type w
     }
     return ret;
 }
+#endif
 
 int main()
 {
-    using size_type = Image::size_type;
-
     test_array();
 
-    Image img = read(R"(C:\Users\krjef\CLionProjects\image_library\memorial.pfm)");
+    auto img_f = read_pfm(R"(C:\Users\krjef\CLionProjects\image_library\memorial.pfm)");
+    write_pfm("mem_out.pmf", img_f);
+
+    auto img_8 = read_ppm_8(R"(C:\Users\krjef\Dropbox\pictures\lucy_liu_color.ppm)");
+    write_ppm_8("lui_out.ppm", img_8);
 
     //SamplerBilinear sampler_bilinear;
     //write("binliear.pfm", reconstruct_image(sampler_bilinear, img));
@@ -392,7 +397,9 @@ int main()
     //SamplerGauss sampler_gauss3(3, 0.001f);
     //write("gauss3.pfm", reconstruct_image(sampler_gauss3, img));
 
-#if 1
+#if 0
+    using size_type = Image::size_type;
+
     const size_type width  = img.width() * 3 / 2;
     const size_type height = img.height() * 3 / 2;
     const size_type max_dimension = std::max(width, height);
