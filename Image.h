@@ -8,6 +8,7 @@
 #include "Endian.h"
 #include "IgnoreLineCommentsBuf.h"
 #include "RGB.h"
+#include "RGBA.h"
 
 #include <cassert>
 #include <filesystem>
@@ -38,11 +39,35 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-using ImageSFCf = Array2DSFC<RGBf>;
-using Image_f   = Array2D<RGBf>;
-using Image_8   = Array2D<RGB8>;
-using Image_16  = Array2D<RGB16>;
-using Image_32  = Array2D<RGB32>;
+using ImageSFC_RGBf = Array2DSFC<RGBf>;
+using Image_RGBf    = Array2D<RGBf>;
+using Image_RGB8    = Array2D<RGB8>;
+using Image_RGB16   = Array2D<RGB16>;
+using Image_RGB32   = Array2D<RGB32>;
+
+using ImageSFC_RGBAf = Array2DSFC<RGBAf>;
+using Image_RGBAf    = Array2D<RGBAf>;
+using Image_RGBA8    = Array2D<RGBA8>;
+using Image_RGBA16   = Array2D<RGBA16>;
+using Image_RGBA32   = Array2D<RGBA32>;
+
+template <typename T>
+struct is_floating_point_image : public std::false_type {};
+
+template <>
+struct is_floating_point_image<ImageSFC_RGBf> : public std::true_type {};
+
+template <>
+struct is_floating_point_image<ImageSFC_RGBAf> : public std::true_type {};
+
+template <>
+struct is_floating_point_image<Image_RGBf> : public std::true_type {};
+
+template <>
+struct is_floating_point_image<Image_RGBAf> : public std::true_type {};
+
+template <typename T>
+inline constexpr bool is_floating_point_image_v = is_floating_point_image<T>::value;
 
 inline float rgb_to_srgb(const float u) noexcept
 {
@@ -70,6 +95,16 @@ inline RGBf rgb_to_srgb(const RGBf& c) noexcept
 inline RGBf srgb_to_rgb(const RGBf& c) noexcept
 {
     return { srgb_to_rgb(c.r), srgb_to_rgb(c.g), srgb_to_rgb(c.b) };
+}
+
+inline RGBAf rgb_to_srgb(const RGBAf& c) noexcept
+{
+    return { rgb_to_srgb(c.r), rgb_to_srgb(c.g), rgb_to_srgb(c.b), c.a };
+}
+
+inline RGBAf srgb_to_rgb(const RGBAf& c) noexcept
+{
+    return { srgb_to_rgb(c.r), srgb_to_rgb(c.g), srgb_to_rgb(c.b), c.a };
 }
 
 class LineCommentStreamBufDecorator
@@ -227,7 +262,9 @@ inline void write_plain_ppm(const std::filesystem::path& file, const ImageType& 
     write_plain_ppm(outs, img);
 }
 
-inline void write_pfm(std::ostream& outs, const Image_f& img)
+template <typename ImageType>
+requires is_floating_point_image_v<ImageType>
+inline void write_pfm(std::ostream& outs, const ImageType& img)
 {
     constexpr int byte_order = (std::endian::native == std::endian::little) ? -1 : +1;
 
@@ -244,7 +281,9 @@ inline void write_pfm(std::ostream& outs, const Image_f& img)
     }
 }
 
-inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
+template <typename ImageType>
+requires is_floating_point_image_v<ImageType>
+inline void write_pfm(const std::filesystem::path& file, const ImageType& img)
 {
     std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
     if (!outs) {
@@ -253,7 +292,7 @@ inline void write_pfm(const std::filesystem::path& file, const Image_f& img)
     write_pfm(outs, img);
 }
 
-inline Image_8 read_ppm_8(std::istream& ins)
+inline Image_RGB8 read_ppm_8(std::istream& ins)
 {
     constexpr auto max_value = std::numeric_limits<std::uint8_t>::max();
 
@@ -267,7 +306,7 @@ inline Image_8 read_ppm_8(std::istream& ins)
         throw ImageError("Unexpected color depth");
     }
 
-    Image_8 img(header.width, header.height);
+    Image_RGB8 img(header.width, header.height);
 
     for (int j = header.height - 1; j >= 0; --j) {
         for (int i = 0; i < header.width; ++i) {
@@ -278,10 +317,10 @@ inline Image_8 read_ppm_8(std::istream& ins)
             ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint8_t));
             ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint8_t));
 
-            const auto fc = srgb_to_rgb(to_float(RGB8{r, g, b}));
-            r = static_cast<uint8_t>(fc.r * max_value);
-            g = static_cast<uint8_t>(fc.g * max_value);
-            b = static_cast<uint8_t>(fc.b * max_value);
+            const auto fc = srgb_to_rgb(to_float(RGB8{ r, g, b }));
+            r             = static_cast<uint8_t>(fc.r * max_value);
+            g             = static_cast<uint8_t>(fc.g * max_value);
+            b             = static_cast<uint8_t>(fc.b * max_value);
 
             img(i, j) = RGB8(r, g, b);
         }
@@ -290,7 +329,7 @@ inline Image_8 read_ppm_8(std::istream& ins)
     return img;
 }
 
-inline Image_8 read_ppm_8(const std::filesystem::path& file)
+inline Image_RGB8 read_ppm_8(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
@@ -299,7 +338,7 @@ inline Image_8 read_ppm_8(const std::filesystem::path& file)
     return read_ppm_8(ins);
 }
 
-inline Image_16 read_ppm_16(std::istream& ins)
+inline Image_RGB16 read_ppm_16(std::istream& ins)
 {
     constexpr auto max_value = std::numeric_limits<std::uint16_t>::max();
 
@@ -313,7 +352,7 @@ inline Image_16 read_ppm_16(std::istream& ins)
         throw ImageError("Unexpected color depth");
     }
 
-    Image_16 img(header.width, header.height);
+    Image_RGB16 img(header.width, header.height);
 
     for (int j = header.height - 1; j >= 0; --j) {
         for (int i = 0; i < header.width; ++i) {
@@ -328,10 +367,10 @@ inline Image_16 read_ppm_16(std::istream& ins)
             g = big_to_native_endian(g);
             b = big_to_native_endian(b);
 
-            const auto fc = srgb_to_rgb(to_float(RGB16{r, g, b}));
-            r = static_cast<uint16_t>(fc.r * max_value);
-            g = static_cast<uint16_t>(fc.g * max_value);
-            b = static_cast<uint16_t>(fc.b * max_value);
+            const auto fc = srgb_to_rgb(to_float(RGB16{ r, g, b }));
+            r             = static_cast<uint16_t>(fc.r * max_value);
+            g             = static_cast<uint16_t>(fc.g * max_value);
+            b             = static_cast<uint16_t>(fc.b * max_value);
 
             img(i, j) = RGB16(r, g, b);
         }
@@ -340,7 +379,7 @@ inline Image_16 read_ppm_16(std::istream& ins)
     return img;
 }
 
-inline Image_16 read_ppm_16(const std::filesystem::path& file)
+inline Image_RGB16 read_ppm_16(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
@@ -350,7 +389,7 @@ inline Image_16 read_ppm_16(const std::filesystem::path& file)
 }
 
 // TODO: this should also work with space-filling version
-inline Image_f read_pfm(std::istream& ins)
+inline Image_RGBf read_pfm(std::istream& ins)
 {
     const auto header = read_pnm_header(ins);
     if (header.format != ImageFormat::PFM) {
@@ -363,7 +402,7 @@ inline Image_f read_pfm(std::istream& ins)
     const ConvertFunction le      = &little_endian;
     const ConvertFunction convert = (header.byte_order == std::endian::big) ? be : le;
 
-    Image_f img(header.width, header.height);
+    Image_RGBf img(header.width, header.height);
 
     for (int j = header.height - 1; j >= 0; --j) {
         for (int i = 0; i < header.width; ++i) {
@@ -389,7 +428,7 @@ inline Image_f read_pfm(std::istream& ins)
     return img;
 }
 
-inline Image_f read_pfm(const std::filesystem::path& file)
+inline Image_RGBf read_pfm(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
