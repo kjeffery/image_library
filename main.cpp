@@ -382,7 +382,7 @@ int main()
     auto img_f = read_pfm(R"(C:\Users\krjef\CLionProjects\image_library\memorial.pfm)");
     write_pfm("mem_out.pmf", img_f);
 
-    auto img_8 = read_ppm_8(R"(C:\Users\krjef\Dropbox\pictures\lucy_liu_color.ppm)");
+    auto img_8 = read_ppm_8<Image_RGBA8>(R"(C:\Users\krjef\Dropbox\pictures\lucy_liu_color.ppm)");
     write_ppm_8("lui_out.ppm", img_8);
 
     //SamplerBilinear sampler_bilinear;

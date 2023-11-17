@@ -52,19 +52,29 @@ using Image_RGBA16   = Array2D<RGBA16>;
 using Image_RGBA32   = Array2D<RGBA32>;
 
 template <typename T>
-struct is_floating_point_image : public std::false_type {};
+struct is_floating_point_image : public std::false_type
+{
+};
 
 template <>
-struct is_floating_point_image<ImageSFC_RGBf> : public std::true_type {};
+struct is_floating_point_image<ImageSFC_RGBf> : public std::true_type
+{
+};
 
 template <>
-struct is_floating_point_image<ImageSFC_RGBAf> : public std::true_type {};
+struct is_floating_point_image<ImageSFC_RGBAf> : public std::true_type
+{
+};
 
 template <>
-struct is_floating_point_image<Image_RGBf> : public std::true_type {};
+struct is_floating_point_image<Image_RGBf> : public std::true_type
+{
+};
 
 template <>
-struct is_floating_point_image<Image_RGBAf> : public std::true_type {};
+struct is_floating_point_image<Image_RGBAf> : public std::true_type
+{
+};
 
 template <typename T>
 inline constexpr bool is_floating_point_image_v = is_floating_point_image<T>::value;
@@ -179,7 +189,7 @@ inline void write_ppm_8(std::ostream& outs, const ImageType& img)
     println(outs, "{}", max_value);
     for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
-            const RGBf c  = rgb_to_srgb(clamp(to_float(img(i, j))));
+            const auto c  = rgb_to_srgb(clamp(to_float(img(i, j))));
             const auto ir = static_cast<uint8_t>(max_value * c.r);
             const auto ig = static_cast<uint8_t>(max_value * c.g);
             const auto ib = static_cast<uint8_t>(max_value * c.b);
@@ -202,7 +212,7 @@ inline void write_ppm_16(std::ostream& outs, const ImageType& img)
     println(outs, "{}", max_value);
     for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
-            const RGBf c  = rgb_to_srgb(clamp(to_float(img(i, j))));
+            const auto c  = rgb_to_srgb(clamp(to_float(img(i, j))));
             const auto ir = big_endian(static_cast<uint16_t>(max_value * c.r));
             const auto ig = big_endian(static_cast<uint16_t>(max_value * c.g));
             const auto ib = big_endian(static_cast<uint16_t>(max_value * c.b));
@@ -283,7 +293,8 @@ inline void write_pfm(std::ostream& outs, const ImageType& img)
 
 template <typename ImageType>
 requires is_floating_point_image_v<ImageType>
-inline void write_pfm(const std::filesystem::path& file, const ImageType& img)
+inline void write_pfm(const std::filesystem::path& file,
+                      const ImageType&             img)
 {
     std::ofstream outs(file, std::ios_base::binary | std::ios_base::out);
     if (!outs) {
@@ -292,9 +303,14 @@ inline void write_pfm(const std::filesystem::path& file, const ImageType& img)
     write_pfm(outs, img);
 }
 
-inline Image_RGB8 read_ppm_8(std::istream& ins)
+// This would work with floating-point images if we simply changed the conversion function to [0, 1]
+template <typename ImageType>
+requires !is_floating_point_image_v<ImageType>
+inline ImageType read_ppm_8(std::istream & ins)
 {
     constexpr auto max_value = std::numeric_limits<std::uint8_t>::max();
+
+    using ColorType = typename ImageType::value_type;
 
     const auto header = read_pnm_header(ins);
 
@@ -306,7 +322,7 @@ inline Image_RGB8 read_ppm_8(std::istream& ins)
         throw ImageError("Unexpected color depth");
     }
 
-    Image_RGB8 img(header.width, header.height);
+    ImageType img(header.width, header.height);
 
     for (int j = header.height - 1; j >= 0; --j) {
         for (int i = 0; i < header.width; ++i) {
@@ -317,30 +333,38 @@ inline Image_RGB8 read_ppm_8(std::istream& ins)
             ins.read(reinterpret_cast<char*>(&g), sizeof(std::uint8_t));
             ins.read(reinterpret_cast<char*>(&b), sizeof(std::uint8_t));
 
+            // Use the straight RGB8 type here, because we don't need anything extra.
             const auto fc = srgb_to_rgb(to_float(RGB8{ r, g, b }));
             r             = static_cast<uint8_t>(fc.r * max_value);
             g             = static_cast<uint8_t>(fc.g * max_value);
             b             = static_cast<uint8_t>(fc.b * max_value);
 
-            img(i, j) = RGB8(r, g, b);
+            img(i, j) = ColorType(r, g, b);
         }
     }
 
     return img;
 }
 
-inline Image_RGB8 read_ppm_8(const std::filesystem::path& file)
+template <typename ImageType>
+requires !is_floating_point_image_v<ImageType>
+inline ImageType read_ppm_8(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
         throw ImageError("Unable to open " + file.string());
     }
-    return read_ppm_8(ins);
+    return read_ppm_8<ImageType>(ins);
 }
 
-inline Image_RGB16 read_ppm_16(std::istream& ins)
+// This would work with floating-point images if we simply changed the conversion function to [0, 1]
+template <typename ImageType>
+requires !is_floating_point_image_v<ImageType>
+inline ImageType read_ppm_16(std::istream& ins)
 {
     constexpr auto max_value = std::numeric_limits<std::uint16_t>::max();
+
+    using ColorType = typename ImageType::value_type;
 
     const auto header = read_pnm_header(ins);
 
@@ -352,7 +376,7 @@ inline Image_RGB16 read_ppm_16(std::istream& ins)
         throw ImageError("Unexpected color depth");
     }
 
-    Image_RGB16 img(header.width, header.height);
+    ImageType img(header.width, header.height);
 
     for (int j = header.height - 1; j >= 0; --j) {
         for (int i = 0; i < header.width; ++i) {
@@ -367,25 +391,28 @@ inline Image_RGB16 read_ppm_16(std::istream& ins)
             g = big_to_native_endian(g);
             b = big_to_native_endian(b);
 
+            // Use the straight RGB16 type here, because we don't need anything extra.
             const auto fc = srgb_to_rgb(to_float(RGB16{ r, g, b }));
             r             = static_cast<uint16_t>(fc.r * max_value);
             g             = static_cast<uint16_t>(fc.g * max_value);
             b             = static_cast<uint16_t>(fc.b * max_value);
 
-            img(i, j) = RGB16(r, g, b);
+            img(i, j) = ColorType(r, g, b);
         }
     }
 
     return img;
 }
 
-inline Image_RGB16 read_ppm_16(const std::filesystem::path& file)
+template <typename ImageType>
+requires !is_floating_point_image_v<ImageType>
+inline ImageType read_ppm_16(const std::filesystem::path& file)
 {
     std::ifstream ins(file, std::ios_base::binary | std::ios_base::in);
     if (!ins) {
         throw ImageError("Unable to open " + file.string());
     }
-    return read_ppm_16(ins);
+    return read_ppm_16<ImageType>(ins);
 }
 
 // TODO: this should also work with space-filling version
