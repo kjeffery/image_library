@@ -12,4 +12,6 @@ include_directories(Logger)
 add_executable(ImageLibrary main.cpp
         propagate_const.h
         IgnoreLineCommentsBuf.h
+        RGB.h
+        RGBA.h
 )
