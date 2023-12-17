@@ -22,6 +22,13 @@ struct RGB
     {
     }
 
+    explicit constexpr RGB(T i) noexcept
+    : r(i)
+    , g(i)
+    , b(i)
+    {
+    }
+
     constexpr RGB(T ir, T ig, T ib) noexcept
     : r(ir)
     , g(ig)
