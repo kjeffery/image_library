@@ -140,9 +140,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(m_impl.get_allocator(), memory_size(width, height)))
         {
-            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
-            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
-            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
+            logging::log_debug("Allocated storage for {} objects", memory_size(width, height));
+            logging::log_debug("Tiles width: {}", num_tiles_width(width));
+            logging::log_debug("Tiles height: {}", num_tiles_height(height));
             construct();
         }
 
@@ -152,9 +152,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(this->get_allocator(), memory_size(width, height)))
         {
-            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
-            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
-            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
+            logging::log_debug("Allocated storage for {} objects", memory_size(width, height));
+            logging::log_debug("Tiles width: {}", num_tiles_width(width));
+            logging::log_debug("Tiles height: {}", num_tiles_height(height));
             construct();
         }
 
@@ -164,9 +164,9 @@ private:
         , m_height(height)
         , m_data(allocator_traits::allocate(this->get_allocator(), memory_size(width, height)))
         {
-            LOG_DEBUG("Allocated storage for {} objects", memory_size(width, height));
-            LOG_DEBUG("Tiles width: {}", num_tiles_width(width));
-            LOG_DEBUG("Tiles height: {}", num_tiles_height(height));
+            logging::log_debug("Allocated storage for {} objects", memory_size(width, height));
+            logging::log_debug("Tiles width: {}", num_tiles_width(width));
+            logging::log_debug("Tiles height: {}", num_tiles_height(height));
             construct(val);
         }
 
